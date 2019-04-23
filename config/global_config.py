@@ -32,10 +32,10 @@ __C.TRAIN.LEARNING_RATE = 0.0005
 __C.TRAIN.GPU_MEMORY_FRACTION = 0.85
 # Set the GPU allow growth parameter during tensorflow training process
 __C.TRAIN.TF_ALLOW_GROWTH = True
-# Set the shadownet training batch size
+# Set the lanenet training batch size
 __C.TRAIN.BATCH_SIZE = 8
 
-# Set the shadownet validation batch size
+# Set the lanenet validation batch size
 __C.TRAIN.VAL_BATCH_SIZE = 8
 # Set the learning rate decay steps
 __C.TRAIN.LR_DECAY_STEPS = 410000
@@ -47,6 +47,21 @@ __C.TRAIN.CLASSES_NUMS = 2
 __C.TRAIN.IMG_HEIGHT = 256
 # Set the image width
 __C.TRAIN.IMG_WIDTH = 512
+
+
+# set additional parameters for hnet
+# Set the hnet training batch size
+__C.TRAIN.BATCH_SIZE_HNET = 8
+# Set the hnet validation batch size
+__C.TRAIN.VAL_BATCH_SIZE_HNET = 8
+# Set the image height for hnet
+__C.TRAIN.IMG_HEIGHT_HNET = 64
+# Set the image width for hnet
+__C.TRAIN.IMG_WIDTH_HNET = 128
+# Set the max num of lanes per image used for padding
+__C.TRAIN.MAX_NUM_LANE = 4
+# Set the max num of samples per lane used for padding
+__C.TRAIN.MAX_NUM_LANE_SAMPLE = 56
 
 # Test options
 __C.TEST = edict()

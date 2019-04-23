@@ -4,6 +4,8 @@
 # @Author  : Luo Yao
 # @Site    : http://icode.baidu.com/repos/baidu/personal-code/Luoyao
 # @File    : lanenet_hnet_data_processor.py
+# @CoAuthor: Yuliang Guo
+# @ModTime : 04/20/2019
 # @IDE: PyCharm Community Edition
 """
 实现LaneNet中的HNet训练数据流
@@ -17,6 +19,8 @@ try:
     from cv2 import cv2
 except ImportError:
     pass
+from config import global_config
+CFG = global_config.cfg
 
 
 class DataSet(object):
@@ -62,9 +66,10 @@ class DataSet(object):
                     h_samples = info_dict['h_samples']
                     lanes = info_dict['lanes']
 
-                    lane_pts = []
+                    img_lanes = []
                     for lane in lanes:
                         assert len(h_samples) == len(lane)
+                        lane_pts = []
                         for index in range(len(lane)):
                             if lane[index] == -2:
                                 continue
@@ -77,7 +82,22 @@ class DataSet(object):
                             continue
                         if len(lane_pts) <= 3:
                             continue
-                    label_gt_pts.append(lane_pts)
+                        # padding lane samples to the pre-defined fixed size
+                        if len(lane_pts) > CFG.TRAIN.MAX_NUM_LANE_SAMPLE:
+                            lane_pts = lane_pts[:CFG.TRAIN.MAX_NUM_LANE_SAMPLE]
+                        index = len(lane_pts)
+                        while index < CFG.TRAIN.MAX_NUM_LANE_SAMPLE:
+                            lane_pts.append([-2, -2, -2])
+                            index += 1
+                        img_lanes.append(np.array(lane_pts))
+                    # padding num of lanes to the pre-defined fixed size
+                    if len(img_lanes) > CFG.TRAIN.MAX_NUM_LANE:
+                        img_lanes = img_lanes[:CFG.TRAIN.MAX_NUM_LANE]
+                    ii = len(img_lanes)
+                    while ii < CFG.TRAIN.MAX_NUM_LANE:
+                        img_lanes.append(-np.ones([CFG.TRAIN.MAX_NUM_LANE_SAMPLE, 3]))
+                        ii += 1
+                    label_gt_pts.append(np.array(img_lanes))
 
         return np.array(label_image_path), np.array(label_gt_pts)
 
@@ -112,29 +132,34 @@ class DataSet(object):
             gt_pts_list = self._label_gt_pts[idx_start:idx_end]
 
             gt_imgs = []
-
-            for gt_img_path in gt_img_list:
+            gt_pts_all = []
+            for i, gt_img_path in enumerate(gt_img_list):
                 gt_imgs.append(cv2.imread(gt_img_path, cv2.IMREAD_COLOR))
-
+                gt_pts_all.append(gt_pts_list[i])
             self._next_batch_loop_count += 1
-            return gt_imgs, gt_pts_list
+            return gt_imgs, gt_pts_all
 
 
 if __name__ == '__main__':
     import glob
-    json_file_list = glob.glob('{:s}/*.json'.format('/media/baidu/Data/Semantic_Segmentation'
-                                                    '/TUSimple_Lane_Detection/training'))
+    json_file_list = glob.glob('{:s}/label*.json'.format('/media/yuliangguo/NewVolume2TB/Datasets/TuSimple/labeled'))
     json_file_list = [tmp for tmp in json_file_list if 'test' not in tmp]
     val = DataSet(json_file_list)
     a1, a2 = val.next_batch(2)
-    print(a1)
-    print(a2)
-    src_image = cv2.imread(a1[0], cv2.IMREAD_COLOR)
+    print(a1[0].shape)
+    print(a2[0])
+    # src_image = cv2.imread(a1[0], cv2.IMREAD_COLOR)
+    src_image = a1[0]
     image = np.zeros(shape=[src_image.shape[0], src_image.shape[1]], dtype=np.uint8)
-    for pt in a2[0]:
-        ptx = pt[0]
-        pty = pt[1]
-        image[pty, ptx] = 255
+    print('number of lanes: {:d}'.format(len(a2[0])))
+    for lane in a2[0]:
+        print('lane samples: {:d}'.format(len(lane)))
+        for pt in lane:
+            ptx = pt[0].astype(int)
+            if ptx <= 0:
+                continue
+            pty = pt[1].astype(int)
+            image[pty, ptx] = 255
 
     import matplotlib.pyplot as plt
     plt.imshow(image, cmap='gray')

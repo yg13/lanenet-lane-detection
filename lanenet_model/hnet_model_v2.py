@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @Time    : 18-5-21 上午11:38
-# @Author  : Luo Yao
-# @Site    : http://icode.baidu.com/repos/baidu/personal-code/Luoyao
-# @File    : lanenet_hnet_model.py
-# @CoAuthor: Yuliang Guo
-# @ModTime : 04/20/2019
+# @Time    : 04/20/2019
+# @Author  :Yuliang Guo
+# @File    : hnet_v2_model.py
 # @IDE: PyCharm Community Edition
 """
 LaneNet中的HNet模型
@@ -73,7 +70,9 @@ class LaneNetHNet(cnn_basenet.CNNBaseModel):
             maxpool_3 = self.maxpooling(inputdata=conv_stage_6, kernel_size=2, stride=2, name='maxpool_3')
             fc = self.fullyconnect(inputdata=maxpool_3, out_dim=1024, use_bias=False, name='fc')
             fc_relu = self.relu(inputdata=fc, name='fc_relu')
-            output = self.fullyconnect(inputdata=fc_relu, out_dim=6, use_bias=False, name='fc_output')
+            # output = self.fullyconnect(inputdata=fc_relu, out_dim=6, use_bias=False, name='fc_output')
+            # modified network is supposed to output trans_coef = [fx/160, fy/120, cx/160, cy/160, pitch]
+            output = self.fullyconnect(inputdata=fc_relu, out_dim=5, use_bias=False, name='fc_output')
         return output
 
     def compute_loss(self, input_tensor, gt_label_pts, name):
@@ -97,7 +96,7 @@ class LaneNetHNet(cnn_basenet.CNNBaseModel):
                 gt_pts_new = tf.stack([gt_x, gt_y, gt_z], axis=1)
 
                 loss = lanenet_hnet_loss.hnet_loss(gt_pts=gt_pts_new,
-                                                   transformation_coeffcient=trans_coef,
+                                                   trans_coef=trans_coef,
                                                    name='hnet_loss')
                 return [loss, tf.constant(1.)]
 
@@ -186,18 +185,34 @@ if __name__ == '__main__':
                                                      gt_label_pts: label_pts_all})
         print('loss: {:.5f}'.format(loss_val))
         # c_val = sess.run(coffe, feed_dict={input_tensor: images, gt_label_pts: label_pts})
-        print('coefs: ', coefs_val)
-        print('losses: ', losses_val)
-        print('counter: ', counter_val)
+        print(coefs_val)
+        print(losses_val)
+        print(counter_val)
 
-        H = np.zeros([3, 3], np.float32)
-        H[0, 0] = coefs_val[0][0]
-        H[0, 1] = coefs_val[0][1]
-        H[0, 2] = coefs_val[0][2]
-        H[1, 1] = coefs_val[0][3]
-        H[1, 2] = coefs_val[0][4]
-        H[2, 1] = coefs_val[0][5]
-        H[2, 2] = 1
+        # H = np.zeros([3, 3], np.float32)
+        # H[0, 0] = coefs_val[0][0]
+        # H[0, 1] = coefs_val[0][1]
+        # H[0, 2] = coefs_val[0][2]
+        # H[1, 1] = coefs_val[0][3]
+        # H[1, 2] = coefs_val[0][4]
+        # H[2, 1] = coefs_val[0][5]
+        # H[2, 2] = 1
+
+        # print the output of homograph net learned from modified loss
+        fx = coefs_val[0][0]*160
+        fy = coefs_val[0][1]*120
+        cx = coefs_val[0][2]*160
+        cy = coefs_val[0][3]*120
+        c1 = np.cos(coefs_val[0][4])
+        s1 = np.sin(coefs_val[0][4])
+
+        K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+        print('K: ', K)
+        R = np.array([[1, 0, 0], [0, c1, -s1], [0, s1, c1]])
+        print('Rotation: ', R)
+        H_inv = np.matmul(K, R)
+        print('H_inv: ', H_inv)
+        H = np.mat(H_inv).I
         print('H: ', H)
 
         warp_image = cv2.warpPerspective(images[0], H, dsize=(images[0].shape[1], images[0].shape[0]))
