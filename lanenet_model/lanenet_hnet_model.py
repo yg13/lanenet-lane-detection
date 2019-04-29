@@ -91,9 +91,9 @@ class LaneNetHNet(cnn_basenet.CNNBaseModel):
                 return [tf.constant(0.), tf.constant(0.)]
 
             def f2(gt_pts, valid_indices, trans_coef):
-                gt_x = tf.gather_nd(gt_pts[0, :], valid_indices)
-                gt_y = tf.gather_nd(gt_pts[1, :], valid_indices)
-                gt_z = tf.gather_nd(gt_pts[2, :], valid_indices)
+                gt_x = tf.gather(gt_pts[:, 0], valid_indices)
+                gt_y = tf.gather(gt_pts[:, 1], valid_indices)
+                gt_z = tf.gather(gt_pts[:, 2], valid_indices)
                 gt_pts_new = tf.stack([gt_x, gt_y, gt_z], axis=1)
 
                 loss = lanenet_hnet_loss.hnet_loss(gt_pts=gt_pts_new,
@@ -104,14 +104,14 @@ class LaneNetHNet(cnn_basenet.CNNBaseModel):
             # build sub-networks lane-wise, making lane-wise loss back-propagate
             losses = []
             counter = []
-            for j in range(gt_label_pts.shape[0]):
-                for i in range(gt_label_pts.shape[1]):
-                    gt_pts = gt_label_pts[j, i, :, :]
+            for i in range(gt_label_pts.shape[0]):
+                for j in range(gt_label_pts.shape[1]):
+                    gt_pts = gt_label_pts[i, j, :, :]
                     # prune redundant padding points
-                    valid_indices = tf.where(tf.math.greater_equal(gt_pts[0, :], tf.zeros_like(gt_pts[0, :])))
+                    valid_indices = tf.where(tf.greater_equal(gt_pts[:, 0], tf.zeros_like(gt_pts[:, 0])))[:, 0]
                     [loss, cnt] = tf.cond(tf.equal(tf.size(valid_indices), 0),
                                           true_fn=lambda: f1(),
-                                          false_fn=lambda: f2(gt_pts, valid_indices, trans_coefs[j, :]))
+                                          false_fn=lambda: f2(gt_pts, valid_indices, trans_coefs[i, :]))
                     losses.append(loss)
                     counter.append(cnt)
             loss_out = tf.reduce_sum(losses) / tf.reduce_sum(counter)
@@ -148,8 +148,8 @@ if __name__ == '__main__':
                                   CFG.TRAIN.IMG_WIDTH_HNET, 3])
     gt_label_pts = tf.placeholder(dtype=tf.float32,
                                   shape=[CFG.TRAIN.BATCH_SIZE_HNET,
-                                  CFG.TRAIN.MAX_NUM_LANE,
-                                  CFG.TRAIN.MAX_NUM_LANE_SAMPLE, 3])
+                                  CFG.DATASET.MAX_NUM_LANE,
+                                  CFG.DATASET.MAX_NUM_LANE_SAMPLE, 3])
 
     net = LaneNetHNet(phase=tf.constant('train', tf.string))
     # coffe = net.inference(input_tensor, name='hnet')

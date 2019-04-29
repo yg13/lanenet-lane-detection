@@ -21,7 +21,12 @@ except ImportError:
     pass
 from config import global_config
 CFG = global_config.cfg
-
+h_org = CFG.DATASET.IMG_HEIGHT_ORG
+w_org = CFG.DATASET.IMG_WIDTH_ORG
+h_hnet = CFG.TRAIN.IMG_HEIGHT_HNET
+w_hnet = CFG.TRAIN.IMG_WIDTH_HNET
+x_ratio = float(w_hnet) / float(w_org)
+y_ratio = float(h_hnet) / float(h_org)
 
 class DataSet(object):
     """
@@ -74,8 +79,8 @@ class DataSet(object):
                             if lane[index] == -2:
                                 continue
                             else:
-                                ptx = lane[index]
-                                pty = h_samples[index]
+                                ptx = lane[index] * x_ratio
+                                pty = h_samples[index] * y_ratio
                                 ptz = 1
                                 lane_pts.append([ptx, pty, ptz])
                         if not lane_pts:
@@ -83,19 +88,19 @@ class DataSet(object):
                         if len(lane_pts) <= 3:
                             continue
                         # padding lane samples to the pre-defined fixed size
-                        if len(lane_pts) > CFG.TRAIN.MAX_NUM_LANE_SAMPLE:
+                        if len(lane_pts) > CFG.DATASET.MAX_NUM_LANE_SAMPLE:
                             lane_pts = lane_pts[:CFG.TRAIN.MAX_NUM_LANE_SAMPLE]
                         index = len(lane_pts)
-                        while index < CFG.TRAIN.MAX_NUM_LANE_SAMPLE:
+                        while index < CFG.DATASET.MAX_NUM_LANE_SAMPLE:
                             lane_pts.append([-2, -2, -2])
                             index += 1
                         img_lanes.append(np.array(lane_pts))
                     # padding num of lanes to the pre-defined fixed size
-                    if len(img_lanes) > CFG.TRAIN.MAX_NUM_LANE:
-                        img_lanes = img_lanes[:CFG.TRAIN.MAX_NUM_LANE]
+                    if len(img_lanes) > CFG.DATASET.MAX_NUM_LANE:
+                        img_lanes = img_lanes[:CFG.DATASET.MAX_NUM_LANE]
                     ii = len(img_lanes)
-                    while ii < CFG.TRAIN.MAX_NUM_LANE:
-                        img_lanes.append(-np.ones([CFG.TRAIN.MAX_NUM_LANE_SAMPLE, 3]))
+                    while ii < CFG.DATASET.MAX_NUM_LANE:
+                        img_lanes.append(-np.ones([CFG.DATASET.MAX_NUM_LANE_SAMPLE, 3]))
                         ii += 1
                     label_gt_pts.append(np.array(img_lanes))
 
@@ -134,7 +139,9 @@ class DataSet(object):
             gt_imgs = []
             gt_pts_all = []
             for i, gt_img_path in enumerate(gt_img_list):
-                gt_imgs.append(cv2.imread(gt_img_path, cv2.IMREAD_COLOR))
+                img = cv2.imread(gt_img_path, cv2.IMREAD_COLOR)
+                img = cv2.resize(img, (w_hnet, h_hnet), interpolation=cv2.INTER_LINEAR)
+                gt_imgs.append(img)
                 gt_pts_all.append(gt_pts_list[i])
             self._next_batch_loop_count += 1
             return gt_imgs, gt_pts_all
@@ -145,21 +152,24 @@ if __name__ == '__main__':
     json_file_list = glob.glob('{:s}/label*.json'.format('/media/yuliangguo/NewVolume2TB/Datasets/TuSimple/labeled'))
     json_file_list = [tmp for tmp in json_file_list if 'test' not in tmp]
     val = DataSet(json_file_list)
-    a1, a2 = val.next_batch(2)
-    print(a1[0].shape)
-    print(a2[0])
+    imgs, gt_pts_list = val.next_batch(2)
+    print(imgs[0].shape)
+    print(gt_pts_list[0])
     # src_image = cv2.imread(a1[0], cv2.IMREAD_COLOR)
-    src_image = a1[0]
-    image = np.zeros(shape=[src_image.shape[0], src_image.shape[1]], dtype=np.uint8)
-    print('number of lanes: {:d}'.format(len(a2[0])))
-    for lane in a2[0]:
+    src_image = imgs[0]
+    # image = np.zeros(shape=[src_image.shape[0], src_image.shape[1]], dtype=np.uint8)
+    image = imgs[0].astype(np.uint8)
+    print('number of lanes: {:d}'.format(len(gt_pts_list[0])))
+    for lane in gt_pts_list[0]:
         print('lane samples: {:d}'.format(len(lane)))
         for pt in lane:
             ptx = pt[0].astype(int)
             if ptx <= 0:
                 continue
             pty = pt[1].astype(int)
-            image[pty, ptx] = 255
+            image[pty, ptx, 2] = 255
+            image[pty, ptx, 1] = 0
+            image[pty, ptx, 0] = 0
 
     import matplotlib.pyplot as plt
     plt.imshow(image, cmap='gray')

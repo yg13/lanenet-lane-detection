@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# @Time    : 04/18/2019
+# @Time    : 04/23/2019
 # @Author  : Yuliang Guo
-# @File    : train_hnet.py
+# @File    : train_hnet_v2.py
 # @IDE: PyCharm Community Edition
 """
 Train hnet model
@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 
 from config import global_config
-from lanenet_model import lanenet_hnet_model
+from lanenet_model import hnet_model_v2
 from data_provider import lanenet_hnet_data_processor
 
 CFG = global_config.cfg
@@ -64,19 +64,19 @@ def train_net(dataset_dir, weights_path=None):
                                              CFG.DATASET.MAX_NUM_LANE,
                                              CFG.DATASET.MAX_NUM_LANE_SAMPLE, 3])
 
-        net = lanenet_hnet_model.LaneNetHNet(phase=tf.constant('train', tf.string))
+        net = hnet_model_v2.LaneNetHNet(phase=tf.constant('train', tf.string))
 
         # calculate the loss
         loss, coefs, losses, counter = net.compute_loss(input_tensor, gt_label_pts=gt_label_pts, name='hnet')
 
         global_step = tf.Variable(0, trainable=False)
-        learning_rate = tf.train.exponential_decay(CFG.TRAIN.LEARNING_RATE, global_step,
+        learning_rate = tf.train.exponential_decay(CFG.TRAIN.LEARNING_RATE_HNET, global_step,
                                                    100000, 0.1, staircase=True)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
             gvs = optimizer.compute_gradients(loss=loss, var_list=tf.trainable_variables())
-            capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+            capped_gvs = [(tf.clip_by_value(grad, -0.1, 0.1), var) for grad, var in gvs]
             clip_g_optimizer = optimizer.apply_gradients(capped_gvs, global_step=global_step)
             # optimizer = tf.train.MomentumOptimizer(
             #     learning_rate=learning_rate, momentum=0.9).minimize(loss=loss,
@@ -145,60 +145,53 @@ def train_net(dataset_dir, weights_path=None):
                 gt_imgs, gt_pts_list = train_dataset.next_batch(CFG.TRAIN.BATCH_SIZE_HNET)
                 gt_imgs = [tmp - VGG_MEAN for tmp in gt_imgs]
             # phase_train = 'train'
-            _, loss_v, train_summary = sess.run([clip_g_optimizer,
-                                                 loss,
-                                                 train_merge_summary_op],
-                                                feed_dict={input_tensor: gt_imgs,
-                                                           gt_label_pts: gt_pts_list})
+            # coefs_v = sess.run(coefs, feed_dict={input_tensor: gt_imgs})
+            # loss_v_np, losses_v_np, counter_v_np = hnet_model_v2.compute_loss_np(coefs_v, gt_pts_list)
+            # loss_v = sess.run(loss, feed_dict={input_tensor: gt_imgs, gt_label_pts: gt_pts_list})
+            _, loss_v, coefs_v, train_summary = sess.run([clip_g_optimizer, loss, coefs, train_merge_summary_op],
+                                                         feed_dict={input_tensor: gt_imgs,
+                                                                    gt_label_pts: gt_pts_list})
+            print('pitch: \n', np.transpose(coefs_v))
             if math.isnan(loss_v):
                 log.error('cost is: {:.5f}'.format(loss_v))
                 cv2.imwrite('nan_image.png', gt_imgs[0] + VGG_MEAN)
                 continue
 
-            # if epoch % 100 == 0:
-            #     cv2.imwrite('image.png', gt_imgs[0])
-
             cost_time = time.time() - t_start
             train_cost_time_mean.append(cost_time)
             summary_writer.add_summary(summary=train_summary, global_step=epoch)
 
-            # # validation part
-            # with tf.device('/cpu:0'):
-            #     gt_imgs_val, gt_pts_list_val = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE_HNET)
-            #     gt_imgs_val = [cv2.resize(tmp,
-            #                               dsize=(CFG.TRAIN.IMG_WIDTH_HNET, CFG.TRAIN.IMG_HEIGHT_HNET),
-            #                               dst=tmp,
-            #                               interpolation=cv2.INTER_LINEAR)
-            #                    for tmp in gt_imgs_val]
-            #     # gt_imgs_val = [tmp - VGG_MEAN for tmp in gt_imgs_val]
+            # validation part
+            with tf.device('/cpu:0'):
+                gt_imgs_val, gt_pts_list_val = val_dataset.next_batch(CFG.TRAIN.VAL_BATCH_SIZE_HNET)
+                gt_imgs_val = [tmp - VGG_MEAN for tmp in gt_imgs_val]
             # phase_val = 'test'
-            #
-            # t_start_val = time.time()
-            # c_val, val_summary = sess.run([loss, val_merge_summary_op],
-            #                               feed_dict={input_tensor: gt_imgs_val,
-            #                                          gt_label_pts: gt_pts_list_val[0]})
-            #
-            # # if epoch % 100 == 0:
-            # #     cv2.imwrite('test_image.png', gt_imgs_val[0])
-            #
-            # summary_writer.add_summary(val_summary, global_step=epoch)
-            #
-            # cost_time_val = time.time() - t_start_val
-            # val_cost_time_mean.append(cost_time_val)
+
+            t_start_val = time.time()
+            # coefs_v = sess.run(coefs, feed_dict={input_tensor: gt_imgs_val})
+            # loss_v_np, _, _ = hnet_model_v2.compute_loss_np(coefs_v, gt_pts_list_val)
+            c_val, val_summary = sess.run([loss, val_merge_summary_op],
+                                          feed_dict={input_tensor: gt_imgs_val,
+                                                     gt_label_pts: gt_pts_list_val})
+
+            summary_writer.add_summary(val_summary, global_step=epoch)
+
+            cost_time_val = time.time() - t_start_val
+            val_cost_time_mean.append(cost_time_val)
 
             if epoch % CFG.TRAIN.DISPLAY_STEP == 0:
                 log.info('Epoch: {:d} loss= {:6f}'
                          ' mean_cost_time= {:5f}s '.
                          format(epoch + 1, loss_v,
                                 np.mean(train_cost_time_mean)))
-                train_cost_time_mean.clear()
+                # train_cost_time_mean.clear()
 
-            # if epoch % CFG.TRAIN.TEST_DISPLAY_STEP == 0:
-            #     log.info('Epoch_Val: {:d} loss= {:6f} '
-            #              'mean_cost_time= {:5f}s '.
-            #              format(epoch + 1, c_val,
-            #                     np.mean(val_cost_time_mean)))
-            #     val_cost_time_mean.clear()
+            if epoch % CFG.TRAIN.TEST_DISPLAY_STEP == 0:
+                log.info('Epoch_Val: {:d} loss= {:6f} '
+                         'mean_cost_time= {:5f}s '.
+                         format(epoch + 1, c_val,
+                                np.mean(val_cost_time_mean)))
+                # val_cost_time_mean.clear()
 
             if epoch % 2000 == 0:
                 saver.save(sess=sess, save_path=model_save_path, global_step=epoch)
