@@ -85,15 +85,15 @@ def train_net(dataset_dir, weights_path=None):
 
     # Set tf saver
     saver = tf.train.Saver()
-    model_save_dir = 'model/tusimple_hnet'
+    model_save_dir = 'model/tusimple_hnet_v2'
     if not ops.exists(model_save_dir):
         os.makedirs(model_save_dir)
     train_start_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
-    model_name = 'tusimple_hnet_{:s}.ckpt'.format(str(train_start_time))
+    model_name = 'tusimple_hnet_v2_{:s}.ckpt'.format(str(train_start_time))
     model_save_path = ops.join(model_save_dir, model_name)
 
     # Set tf summary
-    tboard_save_path = 'tboard/tusimple_hnet/'
+    tboard_save_path = 'tboard/tusimple_hnet_v2/'
     if not ops.exists(tboard_save_path):
         os.makedirs(tboard_save_path)
     train_cost_scalar = tf.summary.scalar(name='train_cost', tensor=loss)
@@ -125,7 +125,7 @@ def train_net(dataset_dir, weights_path=None):
     with sess.as_default():
 
         tf.train.write_graph(graph_or_graph_def=sess.graph, logdir='',
-                             name='{:s}/hnet_model.pb'.format(model_save_dir))
+                             name='{:s}/hnet_model_v2.pb'.format(model_save_dir))
 
         if weights_path is None:
             log.info('Training from scratch')

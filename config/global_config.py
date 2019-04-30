@@ -60,7 +60,7 @@ __C.TRAIN.IMG_WIDTH_HNET = 128
 # Set max distance allowed for fitting
 __C.TRAIN.MAX_DIST = 500.0
 # Set learning rate for HNET
-__C.TRAIN.LEARNING_RATE_HNET = 0.00005
+__C.TRAIN.LEARNING_RATE_HNET = 0.00001
 # Set gradient clipping threshold
 __C.TRAIN.CLIPPING_TH = 1.0
 
