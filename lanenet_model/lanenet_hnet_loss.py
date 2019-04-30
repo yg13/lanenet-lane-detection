@@ -33,8 +33,10 @@ def hnet_loss(gt_pts, transformation_coeffcient, name):
         # 求解最小二乘二阶多项式拟合参数矩阵
         Y = tf.transpose(pts_projects[1, :])
         X = tf.transpose(pts_projects[0, :])
+        # Comment: it seems wrong not to normalize by Z
         Y_One = tf.add(tf.subtract(Y, Y), tf.constant(1.0, tf.float32))
-        Y_stack = tf.stack([tf.pow(Y, 3), tf.pow(Y, 2), Y, Y_One], axis=1)
+        # Y_stack = tf.stack([tf.pow(Y, 3), tf.pow(Y, 2), Y, Y_One], axis=1)
+        Y_stack = tf.stack([tf.pow(Y, 2), Y, Y_One], axis=1)
         w = tf.matmul(tf.matmul(tf.matrix_inverse(tf.matmul(tf.transpose(Y_stack), Y_stack)),
                                 tf.transpose(Y_stack)),
                       tf.expand_dims(X, -1))
@@ -42,7 +44,7 @@ def hnet_loss(gt_pts, transformation_coeffcient, name):
         x_preds = tf.matmul(Y_stack, w)
         preds = tf.transpose(tf.stack([tf.squeeze(x_preds, -1), Y, Y_One], axis=1))
         x_transformation_back = tf.matmul(tf.matrix_inverse(H), preds)
-
+        # Comment: it seems wrong not to normalize by Z
         loss = tf.reduce_mean(tf.pow(gt_pts[0, :] - x_transformation_back[0, :], 2))
 
     return loss
@@ -71,7 +73,8 @@ def hnet_transformation(gt_pts, transformation_coeffcient, name):
         Y = tf.transpose(pts_projects[1, :])
         X = tf.transpose(pts_projects[0, :])
         Y_One = tf.add(tf.subtract(Y, Y), tf.constant(1.0, tf.float32))
-        Y_stack = tf.stack([tf.pow(Y, 3), tf.pow(Y, 2), Y, Y_One], axis=1)
+        # Y_stack = tf.stack([tf.pow(Y, 3), tf.pow(Y, 2), Y, Y_One], axis=1)
+        Y_stack = tf.stack([tf.pow(Y, 2), Y, Y_One], axis=1)
         w = tf.matmul(tf.matmul(tf.matrix_inverse(tf.matmul(tf.transpose(Y_stack), Y_stack)),
                                 tf.transpose(Y_stack)),
                       tf.expand_dims(X, -1))

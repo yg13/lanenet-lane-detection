@@ -76,7 +76,7 @@ def train_net(dataset_dir, weights_path=None):
         with tf.control_dependencies(update_ops):
             optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
             gvs = optimizer.compute_gradients(loss=loss, var_list=tf.trainable_variables())
-            capped_gvs = [(tf.clip_by_value(grad, -0.1, 0.1), var) for grad, var in gvs]
+            capped_gvs = [(tf.clip_by_value(grad, -CFG.TRAIN.CLIPPING_TH, CFG.TRAIN.CLIPPING_TH), var) for grad, var in gvs]
             clip_g_optimizer = optimizer.apply_gradients(capped_gvs, global_step=global_step)
             # optimizer = tf.train.MomentumOptimizer(
             #     learning_rate=learning_rate, momentum=0.9).minimize(loss=loss,

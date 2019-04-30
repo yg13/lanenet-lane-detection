@@ -176,14 +176,11 @@ if __name__ == '__main__':
         #               # save_path='../model/tusimple_lanenet_hnet/tusimple_lanenet_hnet_2018-08-08-19-32-01.ckpt-200000')
 
         images, label_pts_all = train_dataset.next_batch(CFG.TRAIN.BATCH_SIZE_HNET)
-        images = [cv2.resize(tmp,
-                             (CFG.TRAIN.IMG_WIDTH_HNET, CFG.TRAIN.IMG_HEIGHT_HNET),
-                             interpolation=cv2.INTER_LINEAR) for tmp in images]
         images = [tmp - VGG_MEAN for tmp in images]
 
         loss_val, coefs_val, losses_val, counter_val = sess.run([loss, coefs, losses, counter],
                                                                 feed_dict={input_tensor: images,
-                                                     gt_label_pts: label_pts_all})
+                                                                gt_label_pts: label_pts_all})
         print('loss: {:.5f}'.format(loss_val))
         # c_val = sess.run(coffe, feed_dict={input_tensor: images, gt_label_pts: label_pts})
         print('coefs: ', coefs_val)
@@ -201,5 +198,5 @@ if __name__ == '__main__':
         print('H: ', H)
 
         warp_image = cv2.warpPerspective(images[0], H, dsize=(images[0].shape[1], images[0].shape[0]))
-        cv2.imwrite("src.jpg", images[0] + VGG_MEAN)
-        cv2.imwrite("ret.jpg", warp_image)
+        # cv2.imwrite("src.jpg", images[0] + VGG_MEAN)
+        # cv2.imwrite("ret.jpg", warp_image)

@@ -62,13 +62,13 @@ def hnet_loss(gt_pts, pitch, name):
         Y = tf.transpose(Y)
 
         Y_valid = tf.clip_by_value(Y, -max_dist, max_dist)
-        Y_stack_valid = tf.stack([tf.pow(Y_valid, 3), tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
+        # Y_stack_valid = tf.stack([tf.pow(Y_valid, 3), tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
+        Y_stack_valid = tf.stack([tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
         # X_valid = tf.gather(X, valid_indices)
         X_valid = tf.clip_by_value(X, -max_dist, max_dist)
-        tmp_mat = tf.matmul(tf.transpose(Y_stack_valid), Y_stack_valid)
+        tmp_mat = tf.matrix_inverse(tf.matmul(tf.transpose(Y_stack_valid), Y_stack_valid))
 
-        w = tf.matmul(tf.matmul(tf.matrix_inverse(tmp_mat),
-                                tf.transpose(Y_stack_valid)), tf.expand_dims(X_valid, -1))
+        w = tf.matmul(tf.matmul(tmp_mat, tf.transpose(Y_stack_valid)), tf.expand_dims(X_valid, -1))
 
         # compute re-projection error in image coordinates
         Y_One = tf.ones_like(Y_valid)
@@ -77,8 +77,8 @@ def hnet_loss(gt_pts, pitch, name):
         pts_trans_back = tf.matmul(H_inv, preds)
         X_trans_back = tf.multiply(pts_trans_back[0, :], tf.reciprocal(pts_trans_back[2, :]))
         losses = tf.pow(gt_pts[0, :] - X_trans_back, 2)
-        # loss = tf.reduce_mean(tf.log(tf.add(losses, 1.00001)))
-        loss = tf.reduce_mean(losses)
+        loss = tf.reduce_mean(tf.log(tf.add(losses, 1.00001)))
+        # loss = tf.reduce_mean(losses)
     return tf.cast(loss, tf.float32)
 
 
@@ -122,13 +122,13 @@ def hnet_transformation(gt_pts, pitch, name):
         # valid_indices = tf.where(mask)[:, 0]
         # Y_valid = tf.gather(Y, valid_indices)
         Y_valid = tf.clip_by_value(Y, -max_dist, max_dist)
-        Y_stack_valid = tf.stack([tf.pow(Y_valid, 3), tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
+        # Y_stack_valid = tf.stack([tf.pow(Y_valid, 3), tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
+        Y_stack_valid = tf.stack([tf.pow(Y_valid, 2), Y_valid, tf.ones_like(Y_valid)], axis=1)
         # X_valid = tf.gather(X, valid_indices)
         X_valid = tf.clip_by_value(X, -max_dist, max_dist)
-        tmp_mat = tf.matmul(tf.transpose(Y_stack_valid), Y_stack_valid)
+        tmp_mat = tf.matrix_inverse(tf.matmul(tf.transpose(Y_stack_valid), Y_stack_valid))
 
-        w = tf.matmul(tf.matmul(tf.matrix_inverse(tmp_mat),
-                                tf.transpose(Y_stack_valid)), tf.expand_dims(X_valid, -1))
+        w = tf.matmul(tf.matmul(tmp_mat, tf.transpose(Y_stack_valid)), tf.expand_dims(X_valid, -1))
 
         # compute re-projection error in image coordinates
         Y_One = tf.ones_like(Y_valid)
@@ -178,14 +178,15 @@ def hnet_loss_np(gt_pts, pitch):
     # [valid_indices, _] = np.where(mask)
     # Y_valid = Y[valid_indices, :]
     Y_valid = np.clip(Y, -max_dist, max_dist)
-    Y_stack_valid = np.column_stack([np.power(Y_valid, 3), np.power(Y_valid, 2), Y_valid, np.ones_like(Y_valid)])
+    # Y_stack_valid = np.column_stack([np.power(Y_valid, 3), np.power(Y_valid, 2), Y_valid, np.ones_like(Y_valid)])
+    Y_stack_valid = np.column_stack([np.power(Y_valid, 2), Y_valid, np.ones_like(Y_valid)])
     # X_valid = X[valid_indices, :]
     X_valid = np.clip(X, -max_dist, max_dist)
     tmp_mat = np.mat(np.matmul(np.transpose(Y_stack_valid), Y_stack_valid)).I
     w = np.matmul(np.matmul(tmp_mat, np.transpose(Y_stack_valid)), X_valid)
 
     # compute re-projection error in image coordinates
-    Y_One = np.ones_like(Y, np.float32)
+    Y_One = np.ones_like(Y)
     # Y_stack = np.column_stack([np.power(Y, 3), np.power(Y, 2), Y, Y_One])
     x_preds = np.matmul(Y_stack_valid, w)
     preds = np.transpose(np.column_stack([x_preds, Y_valid, Y_One]))
@@ -194,32 +195,33 @@ def hnet_loss_np(gt_pts, pitch):
     # X_trans_back_valid = X_trans_back[0, valid_indices]
     X_trans_back_valid = X_trans_back
     losses = np.power(gt_pts[0, :] - X_trans_back_valid, 2)
-    # loss = np.mean(np.log(losses + 1.00001))
-    loss = np.mean(losses)
+    loss = np.mean(np.log(losses + 1.00001))
+    # loss = np.mean(losses)
     return loss, X_trans_back, X, Y, X_valid, Y_valid, tmp_mat, w, X_trans_back_valid
 
 
 if __name__ == '__main__':
-    pitch = -22.77807426
-    # org_input = [[0.0, 63.0, 1.0], [8.0, 59.0, 1.0], [16.0, 55.0, 1.0],
-    #              [24.0, 51.0, 1.0], [32.0, 47.0, 1.0], [40.0, 43.0, 1.0],
-    #              [63.0, 32.0, 1.0]]
-    org_input = [[52.7, 26.66666667, 1.],
-                 [49.3, 27.55555556, 1.],
-                 [45.9, 28.44444444, 1.],
-                 [42.5, 29.33333333, 1.],
-                 [39.1, 30.22222222, 1.],
-                 [35.7, 31.11111111, 1.],
-                 [32.3, 32., 1.],
-                 [28.9, 32.88888889, 1.],
-                 [25.5, 33.77777778, 1.],
-                 [22.1, 34.66666667, 1.],
-                 [18.7, 35.55555556, 1.],
-                 [15.3, 36.44444444, 1.],
-                 [11.9, 37.33333333, 1.],
-                 [8.5, 38.22222222, 1.],
-                 [5.1, 39.11111111, 1.],
-                 [1.7, 40., 1.]]
+    pitch = 0.0
+    org_input = [[0.0, 63.0, 1.0], [8.0, 59.0, 1.0], [16.0, 55.0, 1.0],
+                 [24.0, 51.0, 1.0], [32.0, 47.0, 1.0], [40.0, 43.0, 1.0],
+                 [63.0, 32.0, 1.0]]
+    # pitch = -22.77807426
+    # org_input = [[52.7, 26.66666667, 1.],
+    #              [49.3, 27.55555556, 1.],
+    #              [45.9, 28.44444444, 1.],
+    #              [42.5, 29.33333333, 1.],
+    #              [39.1, 30.22222222, 1.],
+    #              [35.7, 31.11111111, 1.],
+    #              [32.3, 32., 1.],
+    #              [28.9, 32.88888889, 1.],
+    #              [25.5, 33.77777778, 1.],
+    #              [22.1, 34.66666667, 1.],
+    #              [18.7, 35.55555556, 1.],
+    #              [15.3, 36.44444444, 1.],
+    #              [11.9, 37.33333333, 1.],
+    #              [8.5, 38.22222222, 1.],
+    #              [5.1, 39.11111111, 1.],
+    #              [1.7, 40., 1.]]
     gt_labels_np = np.array(org_input)
     gt_labels_np = np.reshape(gt_labels_np, [-1, 3])
     gt_labels = tf.constant(org_input, shape=gt_labels_np.shape)
@@ -287,7 +289,7 @@ if __name__ == '__main__':
         print('X_back_valid: ', X_back_valid_val)
 
         loss_val = sess.run(_loss)
-        print('loss float32:', loss_val)
+        print('loss float64:', loss_val)
 
     print('\n compare the error caused by TF by using float64 compared to numpy float64')
     print('diff in inverse mat: ', np.subtract(tmp_mat_val, tmp_mat_val_np))

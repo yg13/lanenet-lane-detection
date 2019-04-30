@@ -123,7 +123,7 @@ class LaneNetHNet(cnn_basenet.CNNBaseModel):
                                           false_fn=lambda: f2(gt_pts, valid_indices, pitch[i]))
                     losses.append(loss)
                     counter.append(cnt)
-            loss_out = tf.add(tf.divide(tf.reduce_sum(losses), tf.reduce_sum(counter)), tf.nn.l2_loss(pitch))
+            loss_out = tf.add(tf.divide(tf.reduce_sum(losses), tf.reduce_sum(counter)), 0.01*tf.nn.l2_loss(pitch))
             # loss_out = tf.nn.l2_loss(pitch)
             return loss_out, trans_coefs, losses, counter
 
@@ -158,7 +158,7 @@ def compute_loss_np(trans_coefs, gt_label_pts):
 
             losses.append(loss_j)
             counter.append(1.0)
-    loss = np.sum(losses) / np.sum(counter) + np.linalg.norm(trans_coefs)
+    loss = np.sum(losses) / np.sum(counter) + 0.01*np.linalg.norm(trans_coefs)
     return loss, losses, counter
 
 
